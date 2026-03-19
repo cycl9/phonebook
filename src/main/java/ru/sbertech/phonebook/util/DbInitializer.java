@@ -20,6 +20,14 @@ import java.util.stream.Collectors;
  *     при условии isEmpty(employees). Повторный запуск приложения не дублирует
  *     записи, потому что таблица уже не пуста.
  *
+ * Обработка существующей «грязной» БД:
+ *   Если phonebook.db уже содержит записи с дублирующимися phone/email
+ *   (артефакт старого бага), попытка создать UNIQUE partial index завершится
+ *   ошибкой SQLITE_CONSTRAINT_UNIQUE. executeSql перехватывает такие ошибки
+ *   только для операторов CREATE UNIQUE INDEX — приложение запускается,
+ *   индекс пропускается, а в stderr печатается предупреждение.
+ *   Для защиты от новых дублей удалите дубли и перезапустите приложение.
+ *
  * Метод initialize() вызывается ровно один раз из Main.main().
  */
 public class DbInitializer {
@@ -47,8 +55,12 @@ public class DbInitializer {
     }
 
     /**
-     * Читает SQL-файл из classpath и выполняет каждое выражение отдельно.
+     * Читает SQL-файл из classpath и выполняет каждый оператор отдельно.
      * Строки-комментарии (начинающиеся с «--») пропускаются перед сплитом.
+     *
+     * Особый случай — CREATE UNIQUE INDEX: если существующие данные нарушают
+     * уникальность (SQLITE_CONSTRAINT_UNIQUE, код 2067, или общий код 19),
+     * оператор пропускается с предупреждением. Все остальные ошибки пробрасываются.
      */
     private static void executeSql(Connection con, String resourcePath)
             throws SQLException, IOException {
@@ -65,13 +77,40 @@ public class DbInitializer {
 
             for (String statement : content.split(";")) {
                 String sql = statement.strip();
-                if (!sql.isEmpty()) {
-                    try (Statement st = con.createStatement()) {
-                        st.execute(sql);
+                if (sql.isEmpty()) continue;
+                try (Statement st = con.createStatement()) {
+                    st.execute(sql);
+                } catch (SQLException e) {
+                    if (isUniqueIndexStatement(sql) && isConstraintViolation(e)) {
+                        // Существующие дубли мешают созданию индекса — пропускаем.
+                        // Индекс не защищает данные до тех пор, пока дубли не будут удалены.
+                        System.err.println(
+                            "WARN DbInitializer: UNIQUE index skipped — existing duplicate data: "
+                            + e.getMessage());
+                    } else {
+                        throw e;
                     }
                 }
             }
         }
+    }
+
+    /** Проверяет, является ли оператор созданием UNIQUE INDEX. */
+    private static boolean isUniqueIndexStatement(String sql) {
+        String upper = sql.toUpperCase();
+        return upper.contains("CREATE") && upper.contains("UNIQUE") && upper.contains("INDEX");
+    }
+
+    /**
+     * Проверяет, является ли исключение нарушением constraint.
+     * SQLite JDBC возвращает:
+     *   19   — SQLITE_CONSTRAINT (общий)
+     *   2067 — SQLITE_CONSTRAINT_UNIQUE (расширенный код)
+     */
+    private static boolean isConstraintViolation(SQLException e) {
+        int code = e.getErrorCode();
+        return code == 19 || code == 2067
+            || (e.getMessage() != null && e.getMessage().contains("SQLITE_CONSTRAINT"));
     }
 
     /** Возвращает true, если таблица не содержит ни одной строки. */
