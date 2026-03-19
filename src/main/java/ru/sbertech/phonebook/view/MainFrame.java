@@ -4,6 +4,7 @@ import ru.sbertech.phonebook.controller.AppController;
 import ru.sbertech.phonebook.model.Employee;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.table.DefaultTableCellRenderer;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.List;
@@ -34,7 +35,8 @@ public class MainFrame extends JFrame {
         refreshTable(controller.findAll());
         updateAdminUI();
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setSize(1200, 650);
+        setMinimumSize(new Dimension(900, 500));
+        setSize(1280, 680);
         setLocationRelativeTo(null);
     }
 
@@ -116,19 +118,59 @@ public class MainFrame extends JFrame {
         return top;
     }
 
+    private static final Color ROW_ODD  = Color.WHITE;
+    private static final Color ROW_EVEN = new Color(245, 248, 252);
+
     private JTable buildTable() {
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        table.setRowHeight(22);
+        table.setRowHeight(24);
         table.setFillsViewportHeight(true);
         table.setAutoResizeMode(JTable.AUTO_RESIZE_SUBSEQUENT_COLUMNS);
-        // Столбец 0 «#» — порядковый номер строки, очень узкий
-        table.getColumnModel().getColumn(0).setMinWidth(30);
-        table.getColumnModel().getColumn(0).setMaxWidth(40);
-        table.getColumnModel().getColumn(0).setPreferredWidth(35);
-        // Столбец 1 «ID» — первичный ключ БД, узкий
-        table.getColumnModel().getColumn(1).setMinWidth(40);
-        table.getColumnModel().getColumn(1).setMaxWidth(60);
-        table.getColumnModel().getColumn(1).setPreferredWidth(50);
+        table.setShowGrid(true);
+        table.setGridColor(new Color(220, 225, 232));
+        table.getTableHeader().setFont(
+            table.getTableHeader().getFont().deriveFont(Font.BOLD, 12f));
+        table.getTableHeader().setBackground(new Color(235, 240, 248));
+        table.getTableHeader().setReorderingAllowed(false);
+
+        // Чередующийся фон строк + выравнивание числовых столбцов
+        DefaultTableCellRenderer renderer = new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(
+                    JTable t, Object value, boolean isSelected, boolean hasFocus, int row, int col) {
+                super.getTableCellRendererComponent(t, value, isSelected, hasFocus, row, col);
+                if (!isSelected) {
+                    setBackground(row % 2 == 0 ? ROW_ODD : ROW_EVEN);
+                    setForeground(Color.BLACK);
+                }
+                // # и ID — по центру
+                setHorizontalAlignment(col <= 1 ? CENTER : LEFT);
+                return this;
+            }
+        };
+        for (int i = 0; i < tableModel.getColumnCount(); i++) {
+            table.getColumnModel().getColumn(i).setCellRenderer(renderer);
+        }
+
+        // Ширины: # | ID | Фамилия | Имя | Отчество | Должность | Раб.тел. | Моб.тел. | Email | Подразделение
+        int[][] widths = {
+            {30, 40,  35},   // 0 #
+            {40, 60,  50},   // 1 ID
+            {80, 200, 120},  // 2 Фамилия
+            {70, 160, 100},  // 3 Имя
+            {70, 160, 100},  // 4 Отчество
+            {90, 250, 140},  // 5 Должность
+            {90, 150, 115},  // 6 Раб.тел.
+            {90, 150, 115},  // 7 Моб.тел.
+            {100, 250, 150}, // 8 Email
+            {80, 400, 160},  // 9 Подразделение
+        };
+        for (int i = 0; i < widths.length; i++) {
+            var col = table.getColumnModel().getColumn(i);
+            col.setMinWidth(widths[i][0]);
+            col.setMaxWidth(widths[i][1]);
+            col.setPreferredWidth(widths[i][2]);
+        }
         return table;
     }
 

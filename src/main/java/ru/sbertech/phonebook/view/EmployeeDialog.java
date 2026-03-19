@@ -4,6 +4,7 @@ import ru.sbertech.phonebook.controller.AppController;
 import ru.sbertech.phonebook.model.Department;
 import ru.sbertech.phonebook.model.Employee;
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -46,8 +47,17 @@ public class EmployeeDialog extends JDialog {
         c.insets = new Insets(4, 8, 4, 8);
         c.anchor = GridBagConstraints.WEST;
 
-        String[] labels = {"Фамилия *", "Имя *", "Отчество", "Должность",
-                           "Раб. телефон", "Моб. телефон", "Email", "Дата рождения (ГГГГ-ММ-ДД)", "Подразделение *"};
+        String[] labels = {
+            "<html>Фамилия <font color='red'>*</font></html>",
+            "<html>Имя <font color='red'>*</font></html>",
+            "Отчество",
+            "Должность",
+            "Раб. телефон",
+            "Моб. телефон",
+            "Email",
+            "Дата рождения (ГГГГ-ММ-ДД)",
+            "<html>Подразделение <font color='red'>*</font></html>"
+        };
         JComponent[] fields = {fLastName, fFirstName, fMiddleName, fPosition,
                                 fPhoneWork, fPhoneMobile, fEmail, fDateOfBirth, cbDept};
 
@@ -58,37 +68,48 @@ public class EmployeeDialog extends JDialog {
             form.add(fields[i], c);
         }
 
-        // Ошибки
-        errorLabel.setForeground(Color.RED);
-        errorLabel.setFont(errorLabel.getFont().deriveFont(Font.PLAIN, 11f));
+        // Подразделения
+        for (Department d : controller.getDepartments()) cbDept.addItem(d);
+
+        // Ошибки — выделенная панель
+        errorLabel.setForeground(new Color(180, 0, 0));
+        errorLabel.setFont(errorLabel.getFont().deriveFont(Font.BOLD, 11f));
+        JPanel errorPanel = new JPanel(new BorderLayout());
+        errorPanel.setBorder(new EmptyBorder(2, 8, 2, 8));
+        errorPanel.add(errorLabel, BorderLayout.CENTER);
+
         c.gridx = 0; c.gridy = labels.length; c.gridwidth = 2;
         c.fill = GridBagConstraints.HORIZONTAL;
-        form.add(errorLabel, c);
+        form.add(errorPanel, c);
+
+        // Подсказка под формой
+        JLabel hint = new JLabel(
+            "<html><font color='gray'><i>" +
+            "<font color='red'>*</font> — обязательные поля.&nbsp;&nbsp;" +
+            "Необходимо указать хотя бы один телефон." +
+            "</i></font></html>");
+        hint.setBorder(new EmptyBorder(6, 8, 4, 8));
 
         // Кнопки
         JButton saveBtn   = new JButton("Сохранить");
         JButton cancelBtn = new JButton("Отмена");
-        JPanel buttons = new JPanel();
-        buttons.add(saveBtn);
+        saveBtn.setPreferredSize(new Dimension(110, 28));
+        cancelBtn.setPreferredSize(new Dimension(90, 28));
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 6));
         buttons.add(cancelBtn);
+        buttons.add(saveBtn);
 
         saveBtn.addActionListener(e -> onSave());
         cancelBtn.addActionListener(e -> dispose());
         getRootPane().setDefaultButton(saveBtn);
 
-        // Подразделения
-        for (Department d : controller.getDepartments()) cbDept.addItem(d);
-
-        // Подсказка: хотя бы один телефон обязателен
-        JLabel phoneHint = new JLabel("* — обязательные поля.  Необходимо указать хотя бы один телефон.");
-        phoneHint.setForeground(new Color(120, 120, 120));
-        phoneHint.setFont(phoneHint.getFont().deriveFont(Font.ITALIC, 11f));
-        phoneHint.setBorder(javax.swing.BorderFactory.createEmptyBorder(4, 8, 4, 8));
+        JPanel south = new JPanel(new BorderLayout());
+        south.add(hint,    BorderLayout.NORTH);
+        south.add(buttons, BorderLayout.SOUTH);
 
         setLayout(new BorderLayout());
-        add(form,      BorderLayout.CENTER);
-        add(phoneHint, BorderLayout.NORTH);
-        add(buttons,   BorderLayout.SOUTH);
+        add(form,  BorderLayout.CENTER);
+        add(south, BorderLayout.SOUTH);
     }
 
     private void populate() {

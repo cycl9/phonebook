@@ -122,4 +122,30 @@ class AppControllerTest {
             () -> controller.addEmployee(emp),
             "addEmployee() без admin-сессии должен бросать SecurityException");
     }
+
+    // ── Тест 10: регистронезависимый поиск через контроллер ─────
+    @Test
+    @DisplayName("searchEmployees() нижний, верхний и смешанный регистры дают одинаковый результат")
+    void searchEmployees_caseInsensitive() {
+        // Добавляем сотрудника через admin-сессию
+        controller.login("admin", "admin123");
+        Employee emp = new Employee();
+        emp.setLastName("Волков");
+        emp.setFirstName("Алексей");
+        emp.setPhoneWork("79005559876");
+        emp.setDepartmentId(1);
+        controller.addEmployee(emp);
+        controller.logout();
+
+        var lower = controller.searchEmployees("волков");
+        var upper = controller.searchEmployees("ВОЛКОВ");
+        var mixed = controller.searchEmployees("Волков");
+
+        assertFalse(lower.isEmpty(), "Нижний регистр 'волков' должен найти 'Волков'");
+        assertFalse(upper.isEmpty(), "Верхний регистр 'ВОЛКОВ' должен найти 'Волков'");
+        assertEquals(lower.size(), upper.size(),
+            "Нижний и верхний регистр должны дать одинаковое количество результатов");
+        assertEquals(lower.size(), mixed.size(),
+            "Смешанный и нижний регистры должны дать одинаковое количество результатов");
+    }
 }
