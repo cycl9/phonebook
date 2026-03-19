@@ -280,14 +280,19 @@ public class SQLiteContactDao implements ContactDao {
         // корректно разрешали нескольких сотрудников без телефона/почты
         ps.setString(5, nullIfBlank(emp.getPhoneWork()));
         ps.setString(6, nullIfBlank(emp.getPhoneMobile()));
-        ps.setString(7, nullIfBlank(emp.getEmail()));
+        ps.setString(7, normalizeEmail(emp.getEmail()));
         ps.setString(8, emp.getDateOfBirth() != null ? emp.getDateOfBirth().toString() : null);
         ps.setInt(9, emp.getDepartmentId());
     }
 
-    /** Возвращает null для null/пустой/пробельной строки, иначе возвращает trim. */
+    /** Возвращает null для null/пустой/пробельной строки, иначе trim. */
     private static String nullIfBlank(String s) {
         return (s == null || s.isBlank()) ? null : s.trim();
+    }
+
+    /** Email: trim + lowercase + blank → NULL. */
+    private static String normalizeEmail(String s) {
+        return (s == null || s.isBlank()) ? null : s.trim().toLowerCase();
     }
 
     private List<Employee> mapResultSet(ResultSet rs) throws SQLException {

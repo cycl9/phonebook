@@ -34,11 +34,11 @@ public class DbInitializer {
             // NULL-значения индексом не охватываются, что позволяет хранить
             // нескольких сотрудников без телефона/почты одновременно.
             st.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_emp_phone_work_uniq " +
-                "ON employees(phone_work) WHERE phone_work IS NOT NULL");
+                "ON employees(phone_work) WHERE phone_work IS NOT NULL AND trim(phone_work) <> ''");
             st.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_emp_phone_mobile_uniq " +
-                "ON employees(phone_mobile) WHERE phone_mobile IS NOT NULL");
+                "ON employees(phone_mobile) WHERE phone_mobile IS NOT NULL AND trim(phone_mobile) <> ''");
             st.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_emp_email_uniq " +
-                "ON employees(email) WHERE email IS NOT NULL");
+                "ON employees(email) WHERE email IS NOT NULL AND trim(email) <> ''");
 
             // Заполняем тестовыми данными только при первом запуске.
             // Если таблица уже содержит записи — data.sql не выполняется.
