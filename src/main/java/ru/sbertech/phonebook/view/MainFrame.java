@@ -121,7 +121,10 @@ public class MainFrame extends JFrame {
         table.setRowHeight(22);
         table.setFillsViewportHeight(true);
         table.setAutoResizeMode(JTable.AUTO_RESIZE_SUBSEQUENT_COLUMNS);
-        table.getColumnModel().getColumn(0).setMaxWidth(45);
+        // Столбец «#» — порядковый номер, узкий
+        table.getColumnModel().getColumn(0).setMinWidth(30);
+        table.getColumnModel().getColumn(0).setMaxWidth(40);
+        table.getColumnModel().getColumn(0).setPreferredWidth(35);
         return table;
     }
 

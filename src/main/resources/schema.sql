@@ -28,6 +28,20 @@ CREATE TABLE IF NOT EXISTS app_users (
     password_hash VARCHAR(200) NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_emp_last_name    ON employees(last_name);
-CREATE INDEX IF NOT EXISTS idx_emp_phone_work   ON employees(phone_work);
-CREATE INDEX IF NOT EXISTS idx_emp_phone_mobile ON employees(phone_mobile);
+-- Обычный индекс для поиска по фамилии
+CREATE INDEX IF NOT EXISTS idx_emp_last_name ON employees(last_name);
+
+-- UNIQUE partial indexes: уникальность только среди непустых значений.
+-- NULL и пустая строка после trim() из проверки исключены —
+-- несколько сотрудников могут не иметь рабочего или мобильного телефона.
+CREATE UNIQUE INDEX IF NOT EXISTS uidx_emp_phone_work
+    ON employees(phone_work)
+    WHERE phone_work IS NOT NULL AND trim(phone_work) <> '';
+
+CREATE UNIQUE INDEX IF NOT EXISTS uidx_emp_phone_mobile
+    ON employees(phone_mobile)
+    WHERE phone_mobile IS NOT NULL AND trim(phone_mobile) <> '';
+
+CREATE UNIQUE INDEX IF NOT EXISTS uidx_emp_email
+    ON employees(email)
+    WHERE email IS NOT NULL AND trim(email) <> '';

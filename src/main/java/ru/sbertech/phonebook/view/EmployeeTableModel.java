@@ -8,11 +8,17 @@ import java.util.List;
 
 /**
  * Модель таблицы для JTable — обновляется без прямого обращения к БД.
+ *
+ * Столбец 0 («#») — порядковый номер строки в текущем отображаемом наборе (1, 2, 3…).
+ * Значение вычисляется как row + 1, всегда соответствует позиции строки в таблице.
+ * Если список фильтруется/сбрасывается через setData(), нумерация пересчитывается автоматически.
+ * Столбцы 1–8 — поля сотрудника (без ID — ID виден только в модели и используется
+ * для delete/edit, но пользователю не показывается).
  */
 public class EmployeeTableModel extends AbstractTableModel {
 
     private static final String[] COLUMNS = {
-        "ID", "Фамилия", "Имя", "Отчество", "Должность",
+        "#", "Фамилия", "Имя", "Отчество", "Должность",
         "Раб.тел.", "Моб.тел.", "Email", "Подразделение"
     };
 
@@ -27,6 +33,7 @@ public class EmployeeTableModel extends AbstractTableModel {
         fireTableDataChanged();
     }
 
+    /** Возвращает объект Employee по индексу строки модели (0-based). */
     public Employee getEmployeeAt(int row) { return rows.get(row); }
 
     @Override public int getRowCount()    { return rows.size(); }
@@ -35,9 +42,9 @@ public class EmployeeTableModel extends AbstractTableModel {
 
     @Override
     public Object getValueAt(int row, int col) {
+        if (col == 0) return row + 1;          // порядковый номер строки (1-based)
         Employee e = rows.get(row);
         return switch (col) {
-            case 0 -> e.getId();
             case 1 -> e.getLastName();
             case 2 -> e.getFirstName();
             case 3 -> e.getMiddleName();

@@ -47,6 +47,18 @@ class AppControllerTest {
                     FOREIGN KEY (department_id) REFERENCES departments(id)
                 )""");
             st.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uidx_emp_phone_work
+                    ON employees(phone_work)
+                    WHERE phone_work IS NOT NULL AND trim(phone_work) <> ''""");
+            st.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uidx_emp_phone_mobile
+                    ON employees(phone_mobile)
+                    WHERE phone_mobile IS NOT NULL AND trim(phone_mobile) <> ''""");
+            st.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uidx_emp_email
+                    ON employees(email)
+                    WHERE email IS NOT NULL AND trim(email) <> ''""");
+            st.execute("""
                 CREATE TABLE IF NOT EXISTS app_users (
                     id            INTEGER PRIMARY KEY AUTOINCREMENT,
                     username      VARCHAR(100) NOT NULL UNIQUE,
