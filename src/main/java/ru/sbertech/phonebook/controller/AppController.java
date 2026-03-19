@@ -109,7 +109,7 @@ public class AppController {
 
     /**
      * Переводит исключение DAO в читаемое сообщение для UI.
-     * Определяет конкретное нарушенное уникальное ограничение по тексту сообщения SQLite.
+     * Инспектирует getCause() (оригинальный SQLException) для точной локализации поля.
      */
     private static String translateDaoError(RuntimeException ex) {
         Throwable cause = ex.getCause();

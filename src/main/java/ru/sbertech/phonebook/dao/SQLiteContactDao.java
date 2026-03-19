@@ -155,7 +155,7 @@ public class SQLiteContactDao implements ContactDao {
                 setter.set(ps);
                 ps.executeUpdate();
             } catch (SQLException e) {
-                throw new RuntimeException("Ошибка записи (shared)", e);
+                throw new RuntimeException(buildErrorMessage(e), e);
             }
         } else {
             try (Connection con = DriverManager.getConnection(dbUrl)) {
@@ -171,12 +171,28 @@ public class SQLiteContactDao implements ContactDao {
                     con.commit();
                 } catch (SQLException e) {
                     try { con.rollback(); } catch (SQLException ignored) {}
-                    throw new RuntimeException("Ошибка записи, транзакция отменена: " + e.getMessage(), e);
+                    throw new RuntimeException(buildErrorMessage(e), e);
                 }
             } catch (SQLException e) {
                 throw new RuntimeException("Ошибка соединения с БД: " + e.getMessage(), e);
             }
         }
+    }
+
+    /**
+     * Формирует сообщение для RuntimeException по конкретному нарушенному constraint.
+     * AppController.translateDaoError инспектирует getCause() (сам SQLException) для
+     * более точной локализации — это сообщение служит запасным вариантом.
+     */
+    private static String buildErrorMessage(SQLException e) {
+        String raw = e.getMessage() != null ? e.getMessage() : "";
+        if (raw.contains("employees.phone_work"))
+            return "Сотрудник с таким рабочим телефоном уже существует.";
+        if (raw.contains("employees.phone_mobile"))
+            return "Сотрудник с таким мобильным телефоном уже существует.";
+        if (raw.contains("employees.email"))
+            return "Сотрудник с таким адресом электронной почты уже существует.";
+        return "Ошибка записи, транзакция отменена: " + raw;
     }
 
     // ── SELECT шаблоны ───────────────────────────────────────────
