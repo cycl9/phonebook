@@ -8,6 +8,7 @@ import ru.sbertech.phonebook.model.Department;
 import ru.sbertech.phonebook.model.Employee;
 import ru.sbertech.phonebook.util.PasswordUtil;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 
@@ -39,12 +40,10 @@ public class AppController {
     public List<Employee>   findByLastName(String v)   { return contactDao.findByLastName(v); }
     public List<Employee>   findByFirstName(String v)  { return contactDao.findByFirstName(v); }
     public List<Employee>   findByName(String v)       { return contactDao.findByName(v); }
-    /** Универсальный поиск: одно или два слова, имя+фамилия, телефон */
     public List<Employee>   searchEmployees(String v)  { return contactDao.searchEmployees(v); }
+
     /**
-     * Комбинированный поиск: сначала фильтрует по подразделению,
-     * затем в рамках результата — по тексту через searchEmployees.
-     * Вся логика поиска сосредоточена в контроллере; UI только передаёт параметры.
+     * Комбинированный поиск: фильтр по подразделению + текстовый поиск.
      */
     public List<Employee> searchEmployees(String query, String dept) {
         boolean hasQuery = query != null && !query.isBlank();
@@ -52,7 +51,6 @@ public class AppController {
         if (!hasQuery && !hasDept) return findAll();
         if (!hasQuery) return contactDao.findByDepartment(dept);
         if (!hasDept)  return contactDao.searchEmployees(query);
-        // Оба условия: ищем по тексту внутри выборки по подразделению
         List<Employee> byDept = contactDao.findByDepartment(dept);
         String q = query.toLowerCase();
         return byDept.stream().filter(e ->
@@ -64,31 +62,69 @@ public class AppController {
     private static boolean matches(String field, String q) {
         return field != null && field.toLowerCase().contains(q);
     }
+
     public List<Employee>   findByDepartment(String v) { return contactDao.findByDepartment(v); }
     public List<Employee>   findByPhone(String v)      { return contactDao.findByPhone(v); }
     public List<Department> getDepartments()           { return departmentDao.findAll(); }
 
+    /**
+     * Добавляет сотрудника. Возвращает список ошибок (пустой — успех).
+     * Нарушение UNIQUE constraint перехватывается и возвращается как
+     * понятное сообщение — исключение не достигает UI.
+     */
     public List<String> addEmployee(Employee emp) {
         requireAdmin();
         List<String> errors = validator.validate(emp);
-        if (errors.isEmpty()) {
-            try { contactDao.insert(emp); }
-            catch (RuntimeException e) { errors.add(e.getMessage()); }
+        if (!errors.isEmpty()) return errors;
+        try {
+            contactDao.insert(emp);
+            return List.of();
+        } catch (RuntimeException ex) {
+            return List.of(translateDaoError(ex));
         }
-        return errors;
     }
+
+    /**
+     * Обновляет сотрудника. Возвращает список ошибок (пустой — успех).
+     * SQLite корректно разрешает UPDATE строки с теми же значениями уникальных полей
+     * (обновляемая строка не конфликтует сама с собой).
+     */
     public List<String> updateEmployee(Employee emp) {
         requireAdmin();
         List<String> errors = validator.validate(emp);
-        if (errors.isEmpty()) {
-            try { contactDao.update(emp); }
-            catch (RuntimeException e) { errors.add(e.getMessage()); }
+        if (!errors.isEmpty()) return errors;
+        try {
+            contactDao.update(emp);
+            return List.of();
+        } catch (RuntimeException ex) {
+            return List.of(translateDaoError(ex));
         }
-        return errors;
     }
+
     public void deleteEmployee(int id) { requireAdmin(); contactDao.delete(id); }
 
     private void requireAdmin() {
         if (!adminSession) throw new SecurityException("Операция доступна только администратору.");
+    }
+
+    /**
+     * Переводит исключение DAO в читаемое сообщение для UI.
+     * Инспектирует getCause() (оригинальный SQLException) для точной локализации поля.
+     */
+    private static String translateDaoError(RuntimeException ex) {
+        Throwable cause = ex.getCause();
+        if (cause instanceof SQLException sqle) {
+            String msg = sqle.getMessage() != null ? sqle.getMessage().toLowerCase() : "";
+            // SQLite выбрасывает код 19 (SQLITE_CONSTRAINT) и сообщение вида
+            // "UNIQUE constraint failed: employees.<column>"
+            if (msg.contains("unique") || sqle.getErrorCode() == 19) {
+                if (msg.contains("phone_work"))   return "Рабочий телефон уже зарегистрирован у другого сотрудника.";
+                if (msg.contains("phone_mobile")) return "Мобильный телефон уже зарегистрирован у другого сотрудника.";
+                if (msg.contains("email"))        return "Email уже зарегистрирован у другого сотрудника.";
+                return "Нарушение уникальности данных. Проверьте телефоны и email.";
+            }
+            if (msg.contains("foreign key")) return "Указанное подразделение не существует.";
+        }
+        return "Ошибка сохранения: " + ex.getMessage();
     }
 }

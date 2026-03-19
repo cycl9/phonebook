@@ -13,12 +13,14 @@ import java.util.List;
  *   SQLiteContactDao(String dbUrl)      — приложение, каждый запрос открывает своё соединение
  *   SQLiteContactDao(Connection shared) — тесты, используется одно переданное соединение
  *
- * Для всех соединений при открытии выполняется PRAGMA foreign_keys = ON,
- * чтобы гарантировать целостность данных (SQLite не сохраняет PRAGMA между сессиями).
+ * Нормализация данных перед записью в БД (метод setParams):
+ *   — trim() для всех строковых полей
+ *   — blank / пустая строка → NULL (чтобы UNIQUE partial indexes корректно
+ *     исключали «отсутствующие» значения из проверки уникальности)
+ *   — email дополнительно приводится к нижнему регистру
  *
- * Все JDBC-ресурсы (Connection, PreparedStatement, ResultSet) закрываются
- * через try-with-resources независимо от того, shared connection или нет.
- * При shared connection закрывается только Statement/ResultSet, но не Connection.
+ * Для всех соединений при открытии выполняется PRAGMA foreign_keys = ON.
+ * sharedCon никогда не закрывается внутри DAO.
  */
 public class SQLiteContactDao implements ContactDao {
 
@@ -41,10 +43,6 @@ public class SQLiteContactDao implements ContactDao {
     }
 
     // ── FR-2 + FR-4: универсальный поиск ─────────────────────────
-    /**
-     * Одно слово  → ищет в last_name OR first_name OR middle_name OR phone_work OR phone_mobile
-     * Два+ слова  → пробует комбинации (last+first) и (last+first+middle)
-     */
     @Override
     public List<Employee> searchEmployees(String query) {
         if (query == null || query.isBlank()) return findAll();
@@ -113,8 +111,9 @@ public class SQLiteContactDao implements ContactDao {
 
     /**
      * Добавляет нового сотрудника.
-     * При собственном соединении — явная транзакция с rollback (NFR-2).
-     * При sharedCon — выполняется в текущей транзакции вызывающей стороны.
+     * Данные нормализуются в setParams перед записью.
+     * При нарушении UNIQUE partial index бросает RuntimeException с причиной SQLException,
+     * которую AppController перехватывает и переводит в понятное сообщение для UI.
      */
     @Override
     public void insert(Employee emp) {
@@ -126,7 +125,8 @@ public class SQLiteContactDao implements ContactDao {
         execUpdate(sql, ps -> setParams(ps, emp));
     }
 
-    /** Обновляет сотрудника (явная транзакция для собственного соединения). */
+    /** Обновляет сотрудника. SQLite корректно обрабатывает UPDATE собственной строки
+     *  — строка, которая обновляется, не конфликтует сама с собой в UNIQUE index. */
     @Override
     public void update(Employee emp) {
         String sql =
@@ -136,17 +136,14 @@ public class SQLiteContactDao implements ContactDao {
         execUpdate(sql, ps -> { setParams(ps, emp); ps.setInt(10, emp.getId()); });
     }
 
-    /** Удаляет сотрудника (явная транзакция для собственного соединения). */
+    /** Удаляет сотрудника по id. */
     @Override
     public void delete(int id) {
         execUpdate("DELETE FROM employees WHERE id=?", ps -> ps.setInt(1, id));
     }
 
-    /**
-     * Шаблонный метод для DML-операций:
-     * — sharedCon: использует его напрямую (autoCommit управляется снаружи, connection НЕ закрывается)
-     * — собственное соединение: явная транзакция setAutoCommit(false) / commit() / rollback()
-     */
+    // ── DML шаблон ───────────────────────────────────────────────
+
     @FunctionalInterface
     private interface PsSetter {
         void set(PreparedStatement ps) throws SQLException;
@@ -154,7 +151,6 @@ public class SQLiteContactDao implements ContactDao {
 
     private void execUpdate(String sql, PsSetter setter) {
         if (sharedCon != null) {
-            // Shared connection (тесты): Statement закрывается через TWR, Connection — нет
             try (PreparedStatement ps = sharedCon.prepareStatement(sql)) {
                 setter.set(ps);
                 ps.executeUpdate();
@@ -162,7 +158,6 @@ public class SQLiteContactDao implements ContactDao {
                 throw new RuntimeException(buildErrorMessage(e), e);
             }
         } else {
-            // Собственное соединение: явная транзакция с rollback при ошибке
             try (Connection con = DriverManager.getConnection(dbUrl)) {
                 try (Statement pragma = con.createStatement()) {
                     pragma.execute("PRAGMA foreign_keys = ON");
@@ -184,6 +179,11 @@ public class SQLiteContactDao implements ContactDao {
         }
     }
 
+    /**
+     * Формирует сообщение для RuntimeException по конкретному нарушенному constraint.
+     * AppController.translateDaoError инспектирует getCause() (сам SQLException) для
+     * более точной локализации — это сообщение служит запасным вариантом.
+     */
     private static String buildErrorMessage(SQLException e) {
         String raw = e.getMessage() != null ? e.getMessage() : "";
         if (raw.contains("employees.phone_work"))
@@ -195,41 +195,8 @@ public class SQLiteContactDao implements ContactDao {
         return "Ошибка записи, транзакция отменена: " + raw;
     }
 
-    // ── helpers ──────────────────────────────────────────────────
+    // ── SELECT шаблоны ───────────────────────────────────────────
 
-    /**
-     * Открывает соединение с PRAGMA foreign_keys = ON.
-     * Для sharedCon — возвращает его напрямую (PRAGMA уже установлена при создании).
-     * Для собственных соединений — включает FK на каждом новом соединении,
-     * так как SQLite не сохраняет PRAGMA между сессиями.
-     */
-    private Connection open() throws SQLException {
-        if (sharedCon != null) return sharedCon;
-        Connection con = DriverManager.getConnection(dbUrl);
-        try (Statement st = con.createStatement()) {
-            st.execute("PRAGMA foreign_keys = ON");
-        }
-        return con;
-    }
-
-    /**
-     * Закрывает соединение только если оно не shared (т.е. было открыто нами).
-     * Statement/ResultSet закрываются через try-with-resources в вызывающих методах.
-     */
-    /**
-     * Закрывает соединение только если оно собственное (не shared).
-     * Вызывается в finally-блоке — НЕ через try-with-resources,
-     * чтобы избежать автоматического close() над sharedCon.
-     */
-    private void closeIfOwn(Connection con) throws SQLException {
-        if (sharedCon == null) con.close();
-    }
-
-    /**
-     * Шаблон для SELECT-запросов с параметрами.
-     * Connection открывается/закрывается вручную через finally,
-     * чтобы sharedCon никогда не был закрыт внутри DAO.
-     */
     @FunctionalInterface
     private interface PsQuery {
         void set(PreparedStatement ps) throws SQLException;
@@ -271,41 +238,81 @@ public class SQLiteContactDao implements ContactDao {
         return execQuery(sql, ps -> ps.setString(1, "%" + value + "%"));
     }
 
+    // ── Connection helpers ────────────────────────────────────────
+
+    private Connection open() throws SQLException {
+        if (sharedCon != null) return sharedCon;
+        Connection con = DriverManager.getConnection(dbUrl);
+        try (Statement st = con.createStatement()) {
+            st.execute("PRAGMA foreign_keys = ON");
+        }
+        return con;
+    }
+
+    private void closeIfOwn(Connection con) throws SQLException {
+        if (sharedCon == null) con.close();
+    }
+
+    // ── Нормализация и маппинг ────────────────────────────────────
+
+    /**
+     * Устанавливает параметры PreparedStatement с нормализацией:
+     *   - trim() для всех строковых полей
+     *   - blank / пустая строка → NULL (совместимо с UNIQUE partial indexes)
+     *   - email → lower(trim(email))
+     */
     private void setParams(PreparedStatement ps, Employee emp) throws SQLException {
-        ps.setString(1, emp.getLastName());
-        ps.setString(2, emp.getFirstName());
-        ps.setString(3, nullIfBlank(emp.getMiddleName()));
-        ps.setString(4, nullIfBlank(emp.getPosition()));
-        // phone/email: пустая строка → NULL, чтобы UNIQUE-индексы
-        // корректно разрешали нескольких сотрудников без телефона/почты
-        ps.setString(5, nullIfBlank(emp.getPhoneWork()));
-        ps.setString(6, nullIfBlank(emp.getPhoneMobile()));
-        ps.setString(7, normalizeEmail(emp.getEmail()));
-        ps.setString(8, emp.getDateOfBirth() != null ? emp.getDateOfBirth().toString() : null);
+        ps.setString(1, trimRequired(emp.getLastName()));
+        ps.setString(2, trimRequired(emp.getFirstName()));
+        setNullable(ps, 3, normalize(emp.getMiddleName()));
+        setNullable(ps, 4, normalize(emp.getPosition()));
+        setNullable(ps, 5, normalize(emp.getPhoneWork()));
+        setNullable(ps, 6, normalize(emp.getPhoneMobile()));
+        setNullable(ps, 7, normalizeEmail(emp.getEmail()));
+        if (emp.getDateOfBirth() != null) {
+            ps.setString(8, emp.getDateOfBirth().toString());
+        } else {
+            ps.setNull(8, Types.VARCHAR);
+        }
         ps.setInt(9, emp.getDepartmentId());
     }
 
-    /** Возвращает null для null/пустой/пробельной строки, иначе trim. */
-    private static String nullIfBlank(String s) {
+    /** Для обязательных полей (last_name, first_name): только trim, null не возвращается. */
+    private static String trimRequired(String s) {
+        return s != null ? s.trim() : "";
+    }
+
+    /** Для необязательных полей: blank/null → null (исключается из UNIQUE partial index). */
+    private static String normalize(String s) {
         return (s == null || s.isBlank()) ? null : s.trim();
     }
 
-    /** Email: trim + lowercase + blank → NULL. */
+    /** Email: trim + toLower + blank → null. */
     private static String normalizeEmail(String s) {
         return (s == null || s.isBlank()) ? null : s.trim().toLowerCase();
+    }
+
+    private static void setNullable(PreparedStatement ps, int i, String v) throws SQLException {
+        if (v == null) ps.setNull(i, Types.VARCHAR);
+        else           ps.setString(i, v);
     }
 
     private List<Employee> mapResultSet(ResultSet rs) throws SQLException {
         List<Employee> list = new ArrayList<>();
         while (rs.next()) {
             Employee e = new Employee();
-            e.setId(rs.getInt("id")); e.setLastName(rs.getString("last_name"));
-            e.setFirstName(rs.getString("first_name")); e.setMiddleName(rs.getString("middle_name"));
-            e.setPosition(rs.getString("position")); e.setPhoneWork(rs.getString("phone_work"));
-            e.setPhoneMobile(rs.getString("phone_mobile")); e.setEmail(rs.getString("email"));
+            e.setId(rs.getInt("id"));
+            e.setLastName(rs.getString("last_name"));
+            e.setFirstName(rs.getString("first_name"));
+            e.setMiddleName(rs.getString("middle_name"));
+            e.setPosition(rs.getString("position"));
+            e.setPhoneWork(rs.getString("phone_work"));
+            e.setPhoneMobile(rs.getString("phone_mobile"));
+            e.setEmail(rs.getString("email"));
             String dob = rs.getString("date_of_birth");
             if (dob != null) e.setDateOfBirth(LocalDate.parse(dob));
-            e.setDepartmentId(rs.getInt("department_id")); e.setDepartmentName(rs.getString("dept"));
+            e.setDepartmentId(rs.getInt("department_id"));
+            e.setDepartmentName(rs.getString("dept"));
             list.add(e);
         }
         return list;
