@@ -1,6 +1,7 @@
 package ru.sbertech.phonebook.view;
 
 import ru.sbertech.phonebook.model.Employee;
+import javax.swing.SwingUtilities;
 import javax.swing.table.AbstractTableModel;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,6 +19,10 @@ public class EmployeeTableModel extends AbstractTableModel {
     private List<Employee> rows = new ArrayList<>();
 
     public void setData(List<Employee> data) {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(() -> setData(data));
+            return;
+        }
         this.rows = new ArrayList<>(data);
         fireTableDataChanged();
     }

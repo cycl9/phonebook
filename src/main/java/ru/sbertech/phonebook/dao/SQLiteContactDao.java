@@ -48,7 +48,9 @@ public class SQLiteContactDao implements ContactDao {
     @Override
     public List<Employee> searchEmployees(String query) {
         if (query == null || query.isBlank()) return findAll();
+        if (query.length() > 200) query = query.substring(0, 200);
         String[] parts = query.trim().split("\\s+");
+        if (parts.length > 5) parts = java.util.Arrays.copyOf(parts, 5);
 
         if (parts.length >= 3) {
             String p1 = "%" + parts[0] + "%", p2 = "%" + parts[1] + "%", p3 = "%" + parts[2] + "%";
@@ -166,15 +168,18 @@ public class SQLiteContactDao implements ContactDao {
                     pragma.execute("PRAGMA foreign_keys = ON");
                 }
                 con.setAutoCommit(false);
-                try (PreparedStatement ps = con.prepareStatement(sql)) {
-                    setter.set(ps);
-                    ps.executeUpdate();
+                try {
+                    try (PreparedStatement ps = con.prepareStatement(sql)) {
+                        setter.set(ps);
+                        ps.executeUpdate();
+                    }
+                    con.commit();
+                } catch (SQLException e) {
+                    try { con.rollback(); } catch (SQLException ignored) {}
+                    throw new RuntimeException("Ошибка записи, транзакция отменена: " + e.getMessage(), e);
                 }
-                con.commit();
             } catch (SQLException e) {
-                // Примечание: если con уже закрыт из-за исключения выше,
-                // rollback() не будет вызван — это стандартное поведение JDBC.
-                throw new RuntimeException("Ошибка записи, транзакция отменена: " + e.getMessage(), e);
+                throw new RuntimeException("Ошибка соединения с БД: " + e.getMessage(), e);
             }
         }
     }

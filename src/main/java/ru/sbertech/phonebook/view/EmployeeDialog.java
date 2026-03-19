@@ -131,7 +131,11 @@ public class EmployeeDialog extends JDialog {
         }
 
         Department dept = (Department) cbDept.getSelectedItem();
-        if (dept != null) employee.setDepartmentId(dept.getId());
+        if (dept == null) {
+            errorLabel.setText("Необходимо выбрать подразделение.");
+            return;
+        }
+        employee.setDepartmentId(dept.getId());
 
         List<String> errors = employee.getId() == 0
                 ? controller.addEmployee(employee)

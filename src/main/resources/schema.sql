@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS employees (
 CREATE TABLE IF NOT EXISTS app_users (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     username      VARCHAR(100) NOT NULL UNIQUE,
-    password_hash VARCHAR(64)  NOT NULL
+    password_hash VARCHAR(200) NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_emp_last_name    ON employees(last_name);

@@ -62,29 +62,6 @@ public class LoginDialog extends JDialog {
         c.anchor = GridBagConstraints.CENTER;
         form.add(errorLabel, c);
 
-        // ── Подсказка ────────────────────────────────────────────
-        JPanel hint = new JPanel();
-        hint.setBackground(new Color(240, 248, 255));
-        hint.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(new Color(180, 210, 240), 1),
-            new EmptyBorder(6, 12, 6, 12)
-        ));
-        hint.setLayout(new BoxLayout(hint, BoxLayout.Y_AXIS));
-
-        JLabel hintTitle = new JLabel("Учётные данные по умолчанию:");
-        hintTitle.setFont(hintTitle.getFont().deriveFont(Font.BOLD, 11f));
-        hintTitle.setForeground(new Color(60, 100, 140));
-        hintTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        JLabel hintCreds = new JLabel("логин: admin   |   пароль: admin123");
-        hintCreds.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-        hintCreds.setForeground(new Color(40, 80, 120));
-        hintCreds.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        hint.add(hintTitle);
-        hint.add(Box.createVerticalStrut(2));
-        hint.add(hintCreds);
-
         // ── Кнопка ───────────────────────────────────────────────
         JButton loginBtn = new JButton("Войти");
         loginBtn.setPreferredSize(new Dimension(120, 32));
@@ -92,13 +69,16 @@ public class LoginDialog extends JDialog {
         btnPanel.add(loginBtn);
 
         // ── Сборка ───────────────────────────────────────────────
-        root.add(form,     BorderLayout.NORTH);
-        root.add(hint,     BorderLayout.CENTER);
+        root.add(form,     BorderLayout.CENTER);
         root.add(btnPanel, BorderLayout.SOUTH);
 
         loginBtn.addActionListener(e -> {
             String user = userField.getText().trim();
             String pass = new String(passField.getPassword());
+            if (user.isEmpty() || pass.isEmpty()) {
+                errorLabel.setText("Введите логин и пароль.");
+                return;
+            }
             if (controller.login(user, pass)) {
                 success = true;
                 dispose();

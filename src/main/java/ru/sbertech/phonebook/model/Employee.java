@@ -42,6 +42,9 @@ public class Employee {
     public void setDepartmentName(String v)     { this.departmentName = v; }
 
     public String getFullName() {
-        return lastName + " " + firstName + (middleName != null && !middleName.isBlank() ? " " + middleName : "");
+        String ln = lastName  != null ? lastName  : "";
+        String fn = firstName != null ? firstName : "";
+        String mn = middleName != null && !middleName.isBlank() ? " " + middleName : "";
+        return (ln + " " + fn + mn).trim();
     }
 }
