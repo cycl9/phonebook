@@ -1,4 +1,4 @@
-package ru.sbertech.phonebook.util;
+package ru.phonebook.util;
 
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;

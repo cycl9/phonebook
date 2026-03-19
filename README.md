@@ -29,7 +29,7 @@ phonebook/
 ├── pom.xml
 ├── src/
 │   ├── main/
-│   │   ├── java/ru/sbertech/phonebook/
+│   │   ├── java/ru/phonebook/
 │   │   │   ├── Main.java                         # Точка входа
 │   │   │   ├── model/
 │   │   │   │   ├── Employee.java                 # Сотрудник
@@ -56,7 +56,7 @@ phonebook/
 │   │   └── resources/
 │   │       ├── schema.sql                        # DDL: CREATE TABLE (SQLite-синтаксис)
 │   │       └── data.sql                          # Тестовые данные + администратор
-│   └── test/java/ru/sbertech/phonebook/
+│   └── test/java/ru/phonebook/
 │       ├── SQLiteContactDaoTest.java             # 6 тестов DAO
 │       ├── ContactValidatorTest.java             # 9 тестов валидации
 │       └── AppControllerTest.java               # 2 теста контроллера (login)

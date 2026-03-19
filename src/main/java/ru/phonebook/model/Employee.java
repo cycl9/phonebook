@@ -1,4 +1,4 @@
-package ru.sbertech.phonebook.model;
+package ru.phonebook.model;
 
 import java.time.LocalDate;
 

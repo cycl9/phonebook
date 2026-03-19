@@ -1,6 +1,6 @@
-package ru.sbertech.phonebook.view;
+package ru.phonebook.view;
 
-import ru.sbertech.phonebook.controller.AppController;
+import ru.phonebook.controller.AppController;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;

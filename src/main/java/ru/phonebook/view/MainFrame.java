@@ -1,7 +1,7 @@
-package ru.sbertech.phonebook.view;
+package ru.phonebook.view;
 
-import ru.sbertech.phonebook.controller.AppController;
-import ru.sbertech.phonebook.model.Employee;
+import ru.phonebook.controller.AppController;
+import ru.phonebook.model.Employee;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableCellRenderer;

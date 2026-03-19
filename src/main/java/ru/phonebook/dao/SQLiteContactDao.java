@@ -1,6 +1,6 @@
-package ru.sbertech.phonebook.dao;
+package ru.phonebook.dao;
 
-import ru.sbertech.phonebook.model.Employee;
+import ru.phonebook.model.Employee;
 import java.sql.*;
 import java.time.LocalDate;
 import java.util.ArrayList;

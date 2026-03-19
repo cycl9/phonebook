@@ -1,6 +1,6 @@
-package ru.sbertech.phonebook.dao;
+package ru.phonebook.dao;
 
-import ru.sbertech.phonebook.model.AppUser;
+import ru.phonebook.model.AppUser;
 import java.sql.*;
 import java.util.Optional;
 

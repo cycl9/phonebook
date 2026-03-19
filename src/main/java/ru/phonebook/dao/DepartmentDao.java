@@ -1,6 +1,6 @@
-package ru.sbertech.phonebook.dao;
+package ru.phonebook.dao;
 
-import ru.sbertech.phonebook.model.Department;
+import ru.phonebook.model.Department;
 import java.util.List;
 
 public interface DepartmentDao {

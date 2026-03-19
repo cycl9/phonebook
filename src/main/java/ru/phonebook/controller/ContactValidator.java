@@ -1,6 +1,6 @@
-package ru.sbertech.phonebook.controller;
+package ru.phonebook.controller;
 
-import ru.sbertech.phonebook.model.Employee;
+import ru.phonebook.model.Employee;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;

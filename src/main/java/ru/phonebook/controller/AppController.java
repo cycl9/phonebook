@@ -1,12 +1,12 @@
-package ru.sbertech.phonebook.controller;
+package ru.phonebook.controller;
 
-import ru.sbertech.phonebook.dao.AppUserDao;
-import ru.sbertech.phonebook.dao.ContactDao;
-import ru.sbertech.phonebook.dao.DepartmentDao;
-import ru.sbertech.phonebook.model.AppUser;
-import ru.sbertech.phonebook.model.Department;
-import ru.sbertech.phonebook.model.Employee;
-import ru.sbertech.phonebook.util.PasswordUtil;
+import ru.phonebook.dao.AppUserDao;
+import ru.phonebook.dao.ContactDao;
+import ru.phonebook.dao.DepartmentDao;
+import ru.phonebook.model.AppUser;
+import ru.phonebook.model.Department;
+import ru.phonebook.model.Employee;
+import ru.phonebook.util.PasswordUtil;
 
 import java.sql.SQLException;
 import java.util.List;

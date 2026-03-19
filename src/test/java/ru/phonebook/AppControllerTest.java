@@ -1,9 +1,9 @@
-package ru.sbertech.phonebook;
+package ru.phonebook;
 
 import org.junit.jupiter.api.*;
-import ru.sbertech.phonebook.controller.AppController;
-import ru.sbertech.phonebook.dao.*;
-import ru.sbertech.phonebook.model.Employee;
+import ru.phonebook.controller.AppController;
+import ru.phonebook.dao.*;
+import ru.phonebook.model.Employee;
 
 import java.sql.*;
 

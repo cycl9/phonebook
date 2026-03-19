@@ -1,8 +1,8 @@
-package ru.sbertech.phonebook;
+package ru.phonebook;
 
 import org.junit.jupiter.api.*;
-import ru.sbertech.phonebook.dao.SQLiteContactDao;
-import ru.sbertech.phonebook.model.Employee;
+import ru.phonebook.dao.SQLiteContactDao;
+import ru.phonebook.model.Employee;
 
 import java.sql.*;
 import java.util.List;

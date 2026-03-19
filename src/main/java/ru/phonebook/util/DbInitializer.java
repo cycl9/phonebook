@@ -1,4 +1,4 @@
-package ru.sbertech.phonebook.util;
+package ru.phonebook.util;
 
 import java.io.BufferedReader;
 import java.io.IOException;

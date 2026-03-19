@@ -1,6 +1,6 @@
-package ru.sbertech.phonebook.view;
+package ru.phonebook.view;
 
-import ru.sbertech.phonebook.model.Employee;
+import ru.phonebook.model.Employee;
 import javax.swing.SwingUtilities;
 import javax.swing.table.AbstractTableModel;
 import java.util.ArrayList;

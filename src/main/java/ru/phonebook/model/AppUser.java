@@ -1,4 +1,4 @@
-package ru.sbertech.phonebook.model;
+package ru.phonebook.model;
 
 public class AppUser {
     private int id;

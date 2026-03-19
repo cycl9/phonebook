@@ -1,10 +1,10 @@
-package ru.sbertech.phonebook;
+package ru.phonebook;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import ru.sbertech.phonebook.controller.ContactValidator;
-import ru.sbertech.phonebook.model.Employee;
+import ru.phonebook.controller.ContactValidator;
+import ru.phonebook.model.Employee;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -102,7 +102,7 @@ class ContactValidatorTest {
     // ── Тест 9: полностью корректный сотрудник ───────────────────
     @Test
     void validate_validEmployee_noErrors() {
-        emp.setEmail("test@sbertech.ru");
+        emp.setEmail("test@phonebook.ru");
         emp.setDateOfBirth(LocalDate.of(1992, 3, 10));
         assertTrue(validator.isValid(emp));
     }
