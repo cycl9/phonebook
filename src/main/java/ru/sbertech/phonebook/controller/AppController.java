@@ -27,7 +27,7 @@ public class AppController {
     public boolean login(String username, String password) {
         Optional<AppUser> user = userDAO.findByUsername(username);
         if (user.isPresent() &&
-                user.get().getPasswordHash().equals(PasswordUtil.sha256hex(password))) {
+                PasswordUtil.verify(password, user.get().getPasswordHash())) {
             adminSession = true; return true;
         }
         return false;

@@ -11,8 +11,10 @@ import java.util.regex.Pattern;
  */
 public class ContactValidator {
 
-    private static final Pattern PHONE_PATTERN = Pattern.compile("^[+\\d()\\-\\s]{7,20}$");
-    private static final Pattern EMAIL_PATTERN  = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+    // Требует минимум 7 цифр внутри допустимых символов
+    private static final Pattern PHONE_PATTERN = Pattern.compile("^(?=(?:\\D*\\d){7})[+\\d()\\-\\s]{7,20}$");
+    // Требует непустой локал, домен ≥2 символов и TLD ≥2 символов
+    private static final Pattern EMAIL_PATTERN  = Pattern.compile("^[^@\\s]+@[^@\\s]{2,}\\.[^@\\s]{2,}$");
 
     /** Возвращает список ошибок; пустой список — валидация прошла. */
     public List<String> validate(Employee emp) {
