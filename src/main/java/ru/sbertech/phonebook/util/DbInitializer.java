@@ -29,7 +29,11 @@ public class DbInitializer {
             st.execute("PRAGMA foreign_keys = ON");
 
             executeSql(con, "/schema.sql");
-            executeSql(con, "/data.sql");
+
+            // Заполняем тестовыми данными только при первом запуске
+            try (ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM employees")) {
+                if (rs.getInt(1) == 0) executeSql(con, "/data.sql");
+            }
 
         } catch (SQLException | IOException e) {
             throw new RuntimeException("Ошибка инициализации БД: " + e.getMessage(), e);
