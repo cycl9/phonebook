@@ -159,7 +159,7 @@ public class SQLiteContactDao implements ContactDao {
                 setter.set(ps);
                 ps.executeUpdate();
             } catch (SQLException e) {
-                throw new RuntimeException("Ошибка записи (shared)", e);
+                throw new RuntimeException(buildErrorMessage(e), e);
             }
         } else {
             // Собственное соединение: явная транзакция с rollback при ошибке
@@ -176,12 +176,23 @@ public class SQLiteContactDao implements ContactDao {
                     con.commit();
                 } catch (SQLException e) {
                     try { con.rollback(); } catch (SQLException ignored) {}
-                    throw new RuntimeException("Ошибка записи, транзакция отменена: " + e.getMessage(), e);
+                    throw new RuntimeException(buildErrorMessage(e), e);
                 }
             } catch (SQLException e) {
                 throw new RuntimeException("Ошибка соединения с БД: " + e.getMessage(), e);
             }
         }
+    }
+
+    private static String buildErrorMessage(SQLException e) {
+        String raw = e.getMessage() != null ? e.getMessage() : "";
+        if (raw.contains("employees.phone_work"))
+            return "Сотрудник с таким рабочим телефоном уже существует.";
+        if (raw.contains("employees.phone_mobile"))
+            return "Сотрудник с таким мобильным телефоном уже существует.";
+        if (raw.contains("employees.email"))
+            return "Сотрудник с таким адресом электронной почты уже существует.";
+        return "Ошибка записи, транзакция отменена: " + raw;
     }
 
     // ── helpers ──────────────────────────────────────────────────
@@ -261,12 +272,27 @@ public class SQLiteContactDao implements ContactDao {
     }
 
     private void setParams(PreparedStatement ps, Employee emp) throws SQLException {
-        ps.setString(1, emp.getLastName()); ps.setString(2, emp.getFirstName());
-        ps.setString(3, emp.getMiddleName()); ps.setString(4, emp.getPosition());
-        ps.setString(5, emp.getPhoneWork()); ps.setString(6, emp.getPhoneMobile());
-        ps.setString(7, emp.getEmail());
+        ps.setString(1, emp.getLastName());
+        ps.setString(2, emp.getFirstName());
+        ps.setString(3, nullIfBlank(emp.getMiddleName()));
+        ps.setString(4, nullIfBlank(emp.getPosition()));
+        // phone/email: пустая строка → NULL, чтобы UNIQUE-индексы
+        // корректно разрешали нескольких сотрудников без телефона/почты
+        ps.setString(5, nullIfBlank(emp.getPhoneWork()));
+        ps.setString(6, nullIfBlank(emp.getPhoneMobile()));
+        ps.setString(7, normalizeEmail(emp.getEmail()));
         ps.setString(8, emp.getDateOfBirth() != null ? emp.getDateOfBirth().toString() : null);
         ps.setInt(9, emp.getDepartmentId());
+    }
+
+    /** Возвращает null для null/пустой/пробельной строки, иначе trim. */
+    private static String nullIfBlank(String s) {
+        return (s == null || s.isBlank()) ? null : s.trim();
+    }
+
+    /** Email: trim + lowercase + blank → NULL. */
+    private static String normalizeEmail(String s) {
+        return (s == null || s.isBlank()) ? null : s.trim().toLowerCase();
     }
 
     private List<Employee> mapResultSet(ResultSet rs) throws SQLException {

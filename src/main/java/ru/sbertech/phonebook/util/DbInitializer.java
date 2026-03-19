@@ -29,7 +29,22 @@ public class DbInitializer {
             st.execute("PRAGMA foreign_keys = ON");
 
             executeSql(con, "/schema.sql");
-            executeSql(con, "/data.sql");
+
+            // Уникальные частичные индексы для phone/email.
+            // NULL-значения индексом не охватываются, что позволяет хранить
+            // нескольких сотрудников без телефона/почты одновременно.
+            st.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_emp_phone_work_uniq " +
+                "ON employees(phone_work) WHERE phone_work IS NOT NULL AND trim(phone_work) <> ''");
+            st.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_emp_phone_mobile_uniq " +
+                "ON employees(phone_mobile) WHERE phone_mobile IS NOT NULL AND trim(phone_mobile) <> ''");
+            st.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_emp_email_uniq " +
+                "ON employees(email) WHERE email IS NOT NULL AND trim(email) <> ''");
+
+            // Заполняем тестовыми данными только при первом запуске.
+            // Если таблица уже содержит записи — data.sql не выполняется.
+            try (ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM employees")) {
+                if (rs.getInt(1) == 0) executeSql(con, "/data.sql");
+            }
 
         } catch (SQLException | IOException e) {
             throw new RuntimeException("Ошибка инициализации БД: " + e.getMessage(), e);
