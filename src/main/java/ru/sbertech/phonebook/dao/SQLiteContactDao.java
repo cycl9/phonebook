@@ -4,7 +4,9 @@ import ru.sbertech.phonebook.model.Employee;
 import java.sql.*;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * SQLite-реализация ContactDao.
@@ -42,47 +44,40 @@ public class SQLiteContactDao implements ContactDao {
         return exec(BASE + "ORDER BY e.last_name, e.first_name");
     }
 
-    // ── FR-2 + FR-4: универсальный поиск ─────────────────────────
+    // ── FR-2 + FR-4: универсальный поиск (регистронезависимый) ──────────────
+    // SQLite lower() не поддерживает кириллицу, поэтому фильтрация выполняется
+    // на стороне Java с использованием String.toLowerCase(Locale("ru")).
     @Override
     public List<Employee> searchEmployees(String query) {
         if (query == null || query.isBlank()) return findAll();
         if (query.length() > 200) query = query.substring(0, 200);
-        String[] parts = query.trim().split("\\s+");
-        if (parts.length > 5) parts = java.util.Arrays.copyOf(parts, 5);
+        String[] rawParts = query.trim().split("\\s+");
+        if (rawParts.length > 5) rawParts = Arrays.copyOf(rawParts, 5);
+        final String[] parts = Arrays.stream(rawParts)
+            .map(p -> p.toLowerCase(Locale.forLanguageTag("ru")))
+            .toArray(String[]::new);
 
-        if (parts.length >= 3) {
-            String p1 = "%" + parts[0] + "%", p2 = "%" + parts[1] + "%", p3 = "%" + parts[2] + "%";
-            return execQuery(BASE +
-                "WHERE (e.last_name LIKE ? AND e.first_name LIKE ? AND e.middle_name LIKE ?) " +
-                "   OR (e.last_name LIKE ? AND e.first_name LIKE ?) " +
-                "   OR (e.last_name LIKE ? AND e.first_name LIKE ?) " +
-                "ORDER BY e.last_name, e.first_name",
-                ps -> {
-                    ps.setString(1, p1); ps.setString(2, p2); ps.setString(3, p3);
-                    ps.setString(4, p1); ps.setString(5, p2);
-                    ps.setString(6, p2); ps.setString(7, p1);
-                });
-        } else if (parts.length == 2) {
-            String p1 = "%" + parts[0] + "%", p2 = "%" + parts[1] + "%";
-            return execQuery(BASE +
-                "WHERE (e.last_name LIKE ? AND e.first_name LIKE ?) " +
-                "   OR (e.last_name LIKE ? AND e.first_name LIKE ?) " +
-                "ORDER BY e.last_name, e.first_name",
-                ps -> {
-                    ps.setString(1, p1); ps.setString(2, p2);
-                    ps.setString(3, p2); ps.setString(4, p1);
-                });
-        } else {
-            String p = "%" + parts[0] + "%";
-            return execQuery(BASE +
-                "WHERE e.last_name LIKE ? OR e.first_name LIKE ? OR e.middle_name LIKE ? " +
-                "   OR e.phone_work LIKE ? OR e.phone_mobile LIKE ? " +
-                "ORDER BY e.last_name, e.first_name",
-                ps -> {
-                    ps.setString(1, p); ps.setString(2, p); ps.setString(3, p);
-                    ps.setString(4, p); ps.setString(5, p);
-                });
-        }
+        return findAll().stream().filter(e -> {
+            if (parts.length >= 3) {
+                return (ciContains(e.getLastName(), parts[0]) && ciContains(e.getFirstName(), parts[1]) && ciContains(e.getMiddleName(), parts[2]))
+                    || (ciContains(e.getLastName(), parts[0]) && ciContains(e.getFirstName(), parts[1]))
+                    || (ciContains(e.getLastName(), parts[1]) && ciContains(e.getFirstName(), parts[0]));
+            } else if (parts.length == 2) {
+                return (ciContains(e.getLastName(), parts[0]) && ciContains(e.getFirstName(), parts[1]))
+                    || (ciContains(e.getLastName(), parts[1]) && ciContains(e.getFirstName(), parts[0]));
+            } else {
+                String p = parts[0];
+                return ciContains(e.getLastName(), p) || ciContains(e.getFirstName(), p)
+                    || ciContains(e.getMiddleName(), p)
+                    || ciContains(e.getPhoneWork(), p) || ciContains(e.getPhoneMobile(), p);
+            }
+        }).toList();
+    }
+
+    /** Регистронезависимое вхождение подстроки lowerPattern (уже в lower) в поле field. */
+    private static boolean ciContains(String field, String lowerPattern) {
+        if (field == null) return false;
+        return field.toLowerCase(Locale.forLanguageTag("ru")).contains(lowerPattern);
     }
 
     @Override
@@ -97,7 +92,11 @@ public class SQLiteContactDao implements ContactDao {
 
     @Override
     public List<Employee> findByDepartment(String v) {
-        return execParam(BASE + "WHERE d.name LIKE ? ORDER BY e.last_name", v);
+        if (v == null || v.isBlank()) return findAll();
+        String lower = v.trim().toLowerCase(Locale.forLanguageTag("ru"));
+        return findAll().stream()
+            .filter(e -> ciContains(e.getDepartmentName(), lower))
+            .toList();
     }
 
     @Override

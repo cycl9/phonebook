@@ -9,24 +9,23 @@ import java.sql.*;
 import java.util.stream.Collectors;
 
 /**
- * Инициализирует базу данных SQLite: создаёт таблицы из schema.sql,
- * загружает справочные данные из data.sql (подразделения, пользователи)
- * и однократно заполняет таблицу employees из employees_seed.sql
- * (только если она пуста — т.е. при первом запуске).
+ * Инициализирует базу данных SQLite.
  *
- * Стратегия seed для сотрудников:
- *   — data.sql использует INSERT OR IGNORE → безопасен для повторных запусков.
- *   — employees_seed.sql использует plain INSERT → выполняется только один раз
- *     при условии isEmpty(employees). Повторный запуск приложения не дублирует
- *     записи, потому что таблица уже не пуста.
+ * Порядок шагов при каждом запуске:
+ *   1. PRAGMA foreign_keys = ON
+ *   2. schema.sql   — CREATE TABLE/INDEX IF NOT EXISTS (всегда idempotent)
+ *   3. Миграция M1  — однократно: нормализация + дедупликация + UNIQUE indexes
+ *      Триггер: отсутствие индекса uidx_emp_phone_work в sqlite_master.
+ *      При наличии индекса шаг полностью пропускается (O(1)).
+ *   4. data.sql     — INSERT OR IGNORE для departments и app_users
+ *   5. employees_seed.sql — plain INSERT, только если employees пуста
  *
- * Обработка существующей «грязной» БД:
- *   Если phonebook.db уже содержит записи с дублирующимися phone/email
- *   (артефакт старого бага), попытка создать UNIQUE partial index завершится
- *   ошибкой SQLITE_CONSTRAINT_UNIQUE. executeSql перехватывает такие ошибки
- *   только для операторов CREATE UNIQUE INDEX — приложение запускается,
- *   индекс пропускается, а в stderr печатается предупреждение.
- *   Для защиты от новых дублей удалите дубли и перезапустите приложение.
+ * Алгоритм дедупликации (M1):
+ *   a. Нормализация phone_work, phone_mobile, email:
+ *      blank/пробельная строка → NULL; trim; email → lower(trim)
+ *   b. DELETE дублей, оставляя строку с наименьшим id:
+ *      для каждого поля — DELETE WHERE id NOT IN (SELECT MIN(id) GROUP BY field)
+ *   c. CREATE UNIQUE INDEX IF NOT EXISTS с условием WHERE field IS NOT NULL AND trim(field) <> ''
  *
  * Метод initialize() вызывается ровно один раз из Main.main().
  */
@@ -42,9 +41,9 @@ public class DbInitializer {
             }
 
             executeSql(con, "/schema.sql");
+            runMigrationM1(con);
             executeSql(con, "/data.sql");
 
-            // Сотрудников seed только при первом запуске (пустая таблица)
             if (isTableEmpty(con, "employees")) {
                 executeSql(con, "/employees_seed.sql");
             }
@@ -54,13 +53,134 @@ public class DbInitializer {
         }
     }
 
+    // ── Migration M1: normalize + dedup + UNIQUE indexes ─────────
+
+    /**
+     * Выполняется только один раз — когда uidx_emp_phone_work ещё не существует.
+     * На чистой БД (первый запуск) таблица employees пуста → нормализация и
+     * удаление дублей — no-op; индексы создаются сразу.
+     * На загрязнённой БД (дубли от старого бага) — дубли удаляются корректно,
+     * после чего индексы создаются без ошибок.
+     */
+    private static void runMigrationM1(Connection con) throws SQLException {
+        if (indexExists(con, "uidx_emp_phone_work")) {
+            return; // уже выполнялась
+        }
+        System.out.println("INFO DbInitializer: running migration M1 (deduplicate + create UNIQUE indexes)");
+        deduplicateEmployees(con);
+        createUniqueIndexes(con);
+        System.out.println("INFO DbInitializer: migration M1 complete");
+    }
+
+    /**
+     * Шаг 1 миграции M1: нормализация данных и удаление дублей в одной транзакции.
+     *
+     * Нормализация:
+     *   phone_work, phone_mobile → trim(); blank → NULL
+     *   email → lower(trim()); blank → NULL
+     *
+     * Дедупликация (для каждого уникального поля):
+     *   Оставляем строку с MIN(id) — самую раннюю. Остальные удаляем.
+     */
+    private static void deduplicateEmployees(Connection con) throws SQLException {
+        boolean prevAutoCommit = con.getAutoCommit();
+        con.setAutoCommit(false);
+        try (Statement st = con.createStatement()) {
+
+            // ── Нормализация phone_work ──────────────────────────
+            st.execute("UPDATE employees SET phone_work = NULL " +
+                       "WHERE phone_work IS NOT NULL AND trim(phone_work) = ''");
+            st.execute("UPDATE employees SET phone_work = trim(phone_work) " +
+                       "WHERE phone_work IS NOT NULL AND phone_work != trim(phone_work)");
+
+            // ── Нормализация phone_mobile ────────────────────────
+            st.execute("UPDATE employees SET phone_mobile = NULL " +
+                       "WHERE phone_mobile IS NOT NULL AND trim(phone_mobile) = ''");
+            st.execute("UPDATE employees SET phone_mobile = trim(phone_mobile) " +
+                       "WHERE phone_mobile IS NOT NULL AND phone_mobile != trim(phone_mobile)");
+
+            // ── Нормализация email ───────────────────────────────
+            st.execute("UPDATE employees SET email = NULL " +
+                       "WHERE email IS NOT NULL AND trim(email) = ''");
+            st.execute("UPDATE employees SET email = lower(trim(email)) " +
+                       "WHERE email IS NOT NULL AND email != lower(trim(email))");
+
+            // ── Дедупликация phone_work (keep MIN id) ────────────
+            st.execute(
+                "DELETE FROM employees " +
+                "WHERE phone_work IS NOT NULL AND trim(phone_work) <> '' " +
+                "  AND id NOT IN (" +
+                "    SELECT MIN(id) FROM employees " +
+                "    WHERE phone_work IS NOT NULL AND trim(phone_work) <> '' " +
+                "    GROUP BY phone_work)");
+
+            // ── Дедупликация phone_mobile (keep MIN id) ──────────
+            st.execute(
+                "DELETE FROM employees " +
+                "WHERE phone_mobile IS NOT NULL AND trim(phone_mobile) <> '' " +
+                "  AND id NOT IN (" +
+                "    SELECT MIN(id) FROM employees " +
+                "    WHERE phone_mobile IS NOT NULL AND trim(phone_mobile) <> '' " +
+                "    GROUP BY phone_mobile)");
+
+            // ── Дедупликация email (keep MIN id) ─────────────────
+            st.execute(
+                "DELETE FROM employees " +
+                "WHERE email IS NOT NULL AND trim(email) <> '' " +
+                "  AND id NOT IN (" +
+                "    SELECT MIN(id) FROM employees " +
+                "    WHERE email IS NOT NULL AND trim(email) <> '' " +
+                "    GROUP BY email)");
+
+            con.commit();
+        } catch (SQLException e) {
+            try { con.rollback(); } catch (SQLException ignored) {}
+            throw e;
+        } finally {
+            con.setAutoCommit(prevAutoCommit);
+        }
+    }
+
+    /** Шаг 2 миграции M1: создание UNIQUE partial indexes. */
+    private static void createUniqueIndexes(Connection con) throws SQLException {
+        try (Statement st = con.createStatement()) {
+            st.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uidx_emp_phone_work " +
+                "ON employees(phone_work) " +
+                "WHERE phone_work IS NOT NULL AND trim(phone_work) <> ''");
+            st.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uidx_emp_phone_mobile " +
+                "ON employees(phone_mobile) " +
+                "WHERE phone_mobile IS NOT NULL AND trim(phone_mobile) <> ''");
+            st.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uidx_emp_email " +
+                "ON employees(email) " +
+                "WHERE email IS NOT NULL AND trim(email) <> ''");
+        }
+    }
+
+    // ── helpers ──────────────────────────────────────────────────
+
+    private static boolean indexExists(Connection con, String name) throws SQLException {
+        try (PreparedStatement ps = con.prepareStatement(
+                "SELECT 1 FROM sqlite_master WHERE type='index' AND name=?")) {
+            ps.setString(1, name);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+    private static boolean isTableEmpty(Connection con, String table) throws SQLException {
+        try (Statement st = con.createStatement();
+             ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM " + table)) {
+            return rs.next() && rs.getInt(1) == 0;
+        }
+    }
+
     /**
      * Читает SQL-файл из classpath и выполняет каждый оператор отдельно.
      * Строки-комментарии (начинающиеся с «--») пропускаются перед сплитом.
-     *
-     * Особый случай — CREATE UNIQUE INDEX: если существующие данные нарушают
-     * уникальность (SQLITE_CONSTRAINT_UNIQUE, код 2067, или общий код 19),
-     * оператор пропускается с предупреждением. Все остальные ошибки пробрасываются.
      */
     private static void executeSql(Connection con, String resourcePath)
             throws SQLException, IOException {
@@ -77,47 +197,12 @@ public class DbInitializer {
 
             for (String statement : content.split(";")) {
                 String sql = statement.strip();
-                if (sql.isEmpty()) continue;
-                try (Statement st = con.createStatement()) {
-                    st.execute(sql);
-                } catch (SQLException e) {
-                    if (isUniqueIndexStatement(sql) && isConstraintViolation(e)) {
-                        // Существующие дубли мешают созданию индекса — пропускаем.
-                        // Индекс не защищает данные до тех пор, пока дубли не будут удалены.
-                        System.err.println(
-                            "WARN DbInitializer: UNIQUE index skipped — existing duplicate data: "
-                            + e.getMessage());
-                    } else {
-                        throw e;
+                if (!sql.isEmpty()) {
+                    try (Statement st = con.createStatement()) {
+                        st.execute(sql);
                     }
                 }
             }
-        }
-    }
-
-    /** Проверяет, является ли оператор созданием UNIQUE INDEX. */
-    private static boolean isUniqueIndexStatement(String sql) {
-        String upper = sql.toUpperCase();
-        return upper.contains("CREATE") && upper.contains("UNIQUE") && upper.contains("INDEX");
-    }
-
-    /**
-     * Проверяет, является ли исключение нарушением constraint.
-     * SQLite JDBC возвращает:
-     *   19   — SQLITE_CONSTRAINT (общий)
-     *   2067 — SQLITE_CONSTRAINT_UNIQUE (расширенный код)
-     */
-    private static boolean isConstraintViolation(SQLException e) {
-        int code = e.getErrorCode();
-        return code == 19 || code == 2067
-            || (e.getMessage() != null && e.getMessage().contains("SQLITE_CONSTRAINT"));
-    }
-
-    /** Возвращает true, если таблица не содержит ни одной строки. */
-    private static boolean isTableEmpty(Connection con, String table) throws SQLException {
-        try (Statement st = con.createStatement();
-             ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM " + table)) {
-            return rs.next() && rs.getInt(1) == 0;
         }
     }
 }

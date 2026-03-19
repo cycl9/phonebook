@@ -166,4 +166,26 @@ class SQLiteContactDaoTest {
         assertTrue(afterDelete.isEmpty(),
             "После удаления сотрудник не должен находиться в БД");
     }
+
+    // ── Тест 7: регистронезависимый поиск — нижний регистр ──────
+    @Test
+    @DisplayName("searchEmployees() находит 'Иванов' по запросу 'иванов' (нижний регистр)")
+    void searchEmployees_lowercaseQuery_findsEmployee() {
+        List<Employee> results = dao.searchEmployees("иванов");
+        assertFalse(results.isEmpty(),
+            "Регистронезависимый поиск: 'иванов' должен найти 'Иванов'");
+        assertTrue(results.stream().anyMatch(e -> "Иванов".equals(e.getLastName())),
+            "В результатах должен быть сотрудник с фамилией 'Иванов'");
+    }
+
+    // ── Тест 8: регистронезависимый поиск — верхний регистр ─────
+    @Test
+    @DisplayName("searchEmployees() находит 'Иванов' по запросу 'ИВАНОВ' (верхний регистр)")
+    void searchEmployees_uppercaseQuery_findsEmployee() {
+        List<Employee> results = dao.searchEmployees("ИВАНОВ");
+        assertFalse(results.isEmpty(),
+            "Регистронезависимый поиск: 'ИВАНОВ' должен найти 'Иванов'");
+        assertTrue(results.stream().anyMatch(e -> "Иванов".equals(e.getLastName())),
+            "В результатах должен быть сотрудник с фамилией 'Иванов'");
+    }
 }
