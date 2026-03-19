@@ -71,13 +71,19 @@ public class AppController {
     public List<String> addEmployee(Employee emp) {
         requireAdmin();
         List<String> errors = validator.validate(emp);
-        if (errors.isEmpty()) contactDao.insert(emp);
+        if (errors.isEmpty()) {
+            try { contactDao.insert(emp); }
+            catch (RuntimeException e) { errors.add(e.getMessage()); }
+        }
         return errors;
     }
     public List<String> updateEmployee(Employee emp) {
         requireAdmin();
         List<String> errors = validator.validate(emp);
-        if (errors.isEmpty()) contactDao.update(emp);
+        if (errors.isEmpty()) {
+            try { contactDao.update(emp); }
+            catch (RuntimeException e) { errors.add(e.getMessage()); }
+        }
         return errors;
     }
     public void deleteEmployee(int id) { requireAdmin(); contactDao.delete(id); }

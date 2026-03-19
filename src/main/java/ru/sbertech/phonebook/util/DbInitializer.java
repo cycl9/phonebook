@@ -30,6 +30,21 @@ public class DbInitializer {
 
             executeSql(con, "/schema.sql");
 
+            // Удаляем дубли, оставляя запись с наименьшим id (идемпотентно)
+            st.execute(
+                "DELETE FROM employees WHERE id NOT IN (" +
+                "  SELECT MIN(id) FROM employees" +
+                "  GROUP BY last_name, first_name, COALESCE(middle_name,'')," +
+                "           COALESCE(phone_work,''), COALESCE(phone_mobile,''))");
+
+            // Уникальные частичные индексы: пустые/NULL значения не участвуют
+            st.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_emp_phone_work_uniq " +
+                "ON employees(phone_work) WHERE phone_work IS NOT NULL AND phone_work != ''");
+            st.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_emp_phone_mobile_uniq " +
+                "ON employees(phone_mobile) WHERE phone_mobile IS NOT NULL AND phone_mobile != ''");
+            st.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_emp_email_uniq " +
+                "ON employees(email) WHERE email IS NOT NULL AND email != ''");
+
             // Заполняем тестовыми данными только при первом запуске
             try (ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM employees")) {
                 if (rs.getInt(1) == 0) executeSql(con, "/data.sql");
