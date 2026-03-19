@@ -9,16 +9,25 @@ import java.util.List;
 /**
  * Модель таблицы для JTable — обновляется без прямого обращения к БД.
  *
- * Столбец 0 («#») — порядковый номер строки в текущем отображаемом наборе (1, 2, 3…).
- * Значение вычисляется как row + 1, всегда соответствует позиции строки в таблице.
- * Если список фильтруется/сбрасывается через setData(), нумерация пересчитывается автоматически.
- * Столбцы 1–8 — поля сотрудника (без ID — ID виден только в модели и используется
- * для delete/edit, но пользователю не показывается).
+ * Структура столбцов:
+ *   0  «#»             — порядковый номер строки в текущем отображаемом наборе (row + 1)
+ *   1  «ID»            — первичный ключ сотрудника из БД
+ *   2  «Фамилия»
+ *   3  «Имя»
+ *   4  «Отчество»
+ *   5  «Должность»
+ *   6  «Раб.тел.»
+ *   7  «Моб.тел.»
+ *   8  «Email»
+ *   9  «Подразделение»
+ *
+ * Нумерация строк (#) пересчитывается автоматически при каждом вызове setData(),
+ * поэтому поиск/фильтрация всегда показывают актуальные порядковые номера.
  */
 public class EmployeeTableModel extends AbstractTableModel {
 
     private static final String[] COLUMNS = {
-        "#", "Фамилия", "Имя", "Отчество", "Должность",
+        "#", "ID", "Фамилия", "Имя", "Отчество", "Должность",
         "Раб.тел.", "Моб.тел.", "Email", "Подразделение"
     };
 
@@ -42,17 +51,18 @@ public class EmployeeTableModel extends AbstractTableModel {
 
     @Override
     public Object getValueAt(int row, int col) {
-        if (col == 0) return row + 1;          // порядковый номер строки (1-based)
+        if (col == 0) return row + 1;   // порядковый номер строки (1-based)
         Employee e = rows.get(row);
         return switch (col) {
-            case 1 -> e.getLastName();
-            case 2 -> e.getFirstName();
-            case 3 -> e.getMiddleName();
-            case 4 -> e.getPosition();
-            case 5 -> e.getPhoneWork();
-            case 6 -> e.getPhoneMobile();
-            case 7 -> e.getEmail();
-            case 8 -> e.getDepartmentName();
+            case 1  -> e.getId();
+            case 2  -> e.getLastName();
+            case 3  -> e.getFirstName();
+            case 4  -> e.getMiddleName();
+            case 5  -> e.getPosition();
+            case 6  -> e.getPhoneWork();
+            case 7  -> e.getPhoneMobile();
+            case 8  -> e.getEmail();
+            case 9  -> e.getDepartmentName();
             default -> null;
         };
     }

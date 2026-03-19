@@ -121,10 +121,14 @@ public class MainFrame extends JFrame {
         table.setRowHeight(22);
         table.setFillsViewportHeight(true);
         table.setAutoResizeMode(JTable.AUTO_RESIZE_SUBSEQUENT_COLUMNS);
-        // Столбец «#» — порядковый номер, узкий
+        // Столбец 0 «#» — порядковый номер строки, очень узкий
         table.getColumnModel().getColumn(0).setMinWidth(30);
         table.getColumnModel().getColumn(0).setMaxWidth(40);
         table.getColumnModel().getColumn(0).setPreferredWidth(35);
+        // Столбец 1 «ID» — первичный ключ БД, узкий
+        table.getColumnModel().getColumn(1).setMinWidth(40);
+        table.getColumnModel().getColumn(1).setMaxWidth(60);
+        table.getColumnModel().getColumn(1).setPreferredWidth(50);
         return table;
     }
 
