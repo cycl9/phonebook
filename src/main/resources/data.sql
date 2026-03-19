@@ -6,7 +6,7 @@ INSERT OR IGNORE INTO departments(name) VALUES
     ('DevOps'),
     ('Управление');
 
-INSERT OR IGNORE INTO employees
+INSERT INTO employees
     (last_name, first_name, middle_name, position, phone_work, phone_mobile, email, date_of_birth, department_id)
 VALUES
     ('Иванов',    'Иван',    'Иванович',   'Ведущий разработчик', '74991112233', '79161112233', 'ivanov@example.com',   '1990-05-15', 1),
