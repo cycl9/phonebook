@@ -272,12 +272,22 @@ public class SQLiteContactDao implements ContactDao {
     }
 
     private void setParams(PreparedStatement ps, Employee emp) throws SQLException {
-        ps.setString(1, emp.getLastName()); ps.setString(2, emp.getFirstName());
-        ps.setString(3, emp.getMiddleName()); ps.setString(4, emp.getPosition());
-        ps.setString(5, emp.getPhoneWork()); ps.setString(6, emp.getPhoneMobile());
-        ps.setString(7, emp.getEmail());
+        ps.setString(1, emp.getLastName());
+        ps.setString(2, emp.getFirstName());
+        ps.setString(3, nullIfBlank(emp.getMiddleName()));
+        ps.setString(4, nullIfBlank(emp.getPosition()));
+        // phone/email: пустая строка → NULL, чтобы UNIQUE-индексы
+        // корректно разрешали нескольких сотрудников без телефона/почты
+        ps.setString(5, nullIfBlank(emp.getPhoneWork()));
+        ps.setString(6, nullIfBlank(emp.getPhoneMobile()));
+        ps.setString(7, nullIfBlank(emp.getEmail()));
         ps.setString(8, emp.getDateOfBirth() != null ? emp.getDateOfBirth().toString() : null);
         ps.setInt(9, emp.getDepartmentId());
+    }
+
+    /** Возвращает null для null/пустой/пробельной строки, иначе возвращает trim. */
+    private static String nullIfBlank(String s) {
+        return (s == null || s.isBlank()) ? null : s.trim();
     }
 
     private List<Employee> mapResultSet(ResultSet rs) throws SQLException {

@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS app_users (
     password_hash VARCHAR(200) NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_emp_last_name    ON employees(last_name);
-CREATE INDEX IF NOT EXISTS idx_emp_phone_work   ON employees(phone_work);
-CREATE INDEX IF NOT EXISTS idx_emp_phone_mobile ON employees(phone_mobile);
+CREATE INDEX IF NOT EXISTS idx_emp_last_name ON employees(last_name);
+-- Уникальные индексы на phone_work, phone_mobile, email создаются
+-- в DbInitializer после schema.sql, чтобы можно было применять
+-- нормализацию данных перед их созданием.
